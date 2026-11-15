@@ -1,0 +1,17 @@
+# User runtime data (generated automatically on first run)
+counter.txt
+counter.backup.txt
+settings.json
+backups/
+display_restore.flag
+
+# IDE / build artifacts
+.vs/
+bin/
+obj/
+*.user
+*.suo
+*.pdb
+*.log
+Thumbs.db
+.DS_Store
