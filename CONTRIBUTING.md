@@ -12,8 +12,8 @@ Thank you for your interest in contributing to **Split Counter Pro**!
 
 1. Clone the repository:
    ```cmd
-   git clone https://github.com/culturalize/Split-Counter.git
-   cd Split-Counter
+   git clone https://github.com/culturalize/Simple-Counter.git
+   cd Simple-Counter
    ```
 2. Run the build script:
    ```cmd

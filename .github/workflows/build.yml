@@ -1,11 +1,15 @@
-name: Build SplitCounter
+name: Build & Release SplitCounter
 
 on:
   push:
     branches: [ main, master ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -22,8 +26,63 @@ jobs:
         shell: cmd
         run: SplitCounter.exe -TestExit
 
-      - name: Upload SplitCounter.exe artifact
+      - name: Package Release Assets (EXE + ZIP + SHA256SUMS)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "dist\SplitCounter" -Force | Out-Null
+          New-Item -ItemType Directory -Path "dist\SplitCounter\src" -Force | Out-Null
+          Copy-Item "SplitCounter.exe" "dist\SplitCounter\SplitCounter.exe" -Force
+          Copy-Item "build.bat" "dist\SplitCounter\build.bat" -Force
+          Copy-Item "README.md" "dist\SplitCounter\README.md" -Force
+          Copy-Item "LICENSE" "dist\SplitCounter\LICENSE" -Force
+          Copy-Item "CHANGELOG.md" "dist\SplitCounter\CHANGELOG.md" -Force
+          Copy-Item "src\Program.cs" "dist\SplitCounter\src\Program.cs" -Force
+          Copy-Item "src\app.ico" "dist\SplitCounter\src\app.ico" -Force
+
+          Compress-Archive -Path "dist\SplitCounter\*" -DestinationPath "SplitCounter-Windows-x64.zip" -Force
+
+          $exeHash = (Get-FileHash "SplitCounter.exe" -Algorithm SHA256).Hash.ToLower()
+          $zipHash = (Get-FileHash "SplitCounter-Windows-x64.zip" -Algorithm SHA256).Hash.ToLower()
+          @(
+            "$exeHash  SplitCounter.exe"
+            "$zipHash  SplitCounter-Windows-x64.zip"
+          ) | Set-Content -Path "SHA256SUMS.txt" -Encoding UTF8
+
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: SplitCounter-Windows-x64
-          path: SplitCounter.exe
+          path: |
+            SplitCounter.exe
+            SplitCounter-Windows-x64.zip
+            SHA256SUMS.txt
+
+      - name: Publish GitHub Release on Tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $notes = @"
+          ## Split Counter Pro $tag
+
+          Ultra-lightweight global hotkey counter & customizable game HUD overlay for Windows 10/11 (~115 KB standalone executable, ~3.4 MB idle RAM, zero external dependencies).
+
+          ### 📥 Installation (Pick Either Option)
+          - **Option 1 — Direct Standalone App:** Download **`SplitCounter.exe`** below and run it directly. It automatically creates `counter.txt` (starting at `0`) and `settings.json` on first launch.
+          - **Option 2 — Full Release Bundle (`.zip`):** Download **`SplitCounter-Windows-x64.zip`** containing `SplitCounter.exe`, `build.bat` (1-click source compiler), `README.md`, `LICENSE`, and `src\`.
+
+          ### ✨ Highlights in $tag
+          - **4 View Modes (`F6`):** Full Card, Mini Card, Slim Gaming HUD Pill, and Just Number Transparent Floating Overlay.
+          - **5-Tab Customization Studio (`⚙ Setup`):**
+            - Visual Keyboard (`100%`, `80% TKL`, `75%`, `65%`, `60%`) & 5-Button Gaming Mouse hotkey selector.
+            - Free-draggable custom images & 8 built-in game stickers (Chest, Crown, Gem, Skull, Flame, Key, Trophy, Star).
+            - 19 colour themes + Custom RGB Theme Builder.
+            - 8 fonts, custom prefix/suffix labels, adjustable outline width, and 2-color directional custom gradients.
+          - **100% Mouse Pass-Through Mode (`F8`):** Mouse aiming, hover, and clicks pass straight through the overlay into your game.
+          - **Hold-Click + Scroll Wheel Scaling:** Live resize the counter number or any sticker on the fly.
+          - **Automatic Game Watcher (`-Watch`):** Optional ~3.4 MB idle watcher that opens the counter when Fortnite launches and closes when it exits, plus 30-day rolling daily backups.
+          "@
+          $notes | Set-Content -Path "RELEASE_NOTES.md" -Encoding UTF8
+          gh release create $tag "SplitCounter.exe" "SplitCounter-Windows-x64.zip" "SHA256SUMS.txt" --title "Split Counter Pro $tag" --notes-file "RELEASE_NOTES.md"

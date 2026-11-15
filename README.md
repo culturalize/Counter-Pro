@@ -2,9 +2,12 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Platform: Windows](https://img.shields.io/badge/Platform-Windows%2010%2F11-0078D6.svg)](#requirements)
-[![Build](https://github.com/culturalize/Split-Counter/actions/workflows/build.yml/badge.svg)](https://github.com/culturalize/Split-Counter/actions/workflows/build.yml)
+[![Latest Release](https://img.shields.io/github/v/release/culturalize/Simple-Counter?label=Download&color=success)](https://github.com/culturalize/Simple-Counter/releases/latest)
+[![Build](https://github.com/culturalize/Simple-Counter/actions/workflows/build.yml/badge.svg)](https://github.com/culturalize/Simple-Counter/actions/workflows/build.yml)
 
 **Split Counter Pro** is a fast, ultra-lightweight global hotkey counter and customizable desktop/game HUD overlay for Windows. Built directly on Win32 and GDI+ with zero external dependencies, it runs as a single ~115 KB executable using near-zero CPU and ~3.4 MB RAM when idle.
+
+> **📥 Easy Install:** Go to the [**Releases page**](https://github.com/culturalize/Simple-Counter/releases/latest) and download **`SplitCounter.exe`** (standalone single file) or **`SplitCounter-v2.0.0-Windows-x64.zip`**. No installer required.
 
 ---
 
