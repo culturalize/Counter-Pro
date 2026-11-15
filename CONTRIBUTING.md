@@ -12,8 +12,8 @@ Thank you for your interest in contributing to **Counter-Pro**!
 
 1. Clone the repository:
    ```cmd
-   git clone https://github.com/culturalize/Simple-Counter.git
-   cd Simple-Counter
+   git clone https://github.com/culturalize/Counter-Pro.git
+   cd Counter-Pro
    ```
 2. Run the build script:
    ```cmd
