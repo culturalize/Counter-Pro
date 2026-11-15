@@ -1,6 +1,6 @@
-# Contributing to Split Counter Pro
+# Contributing to Counter-Pro
 
-Thank you for your interest in contributing to **Split Counter Pro**!
+Thank you for your interest in contributing to **Counter-Pro**!
 
 ## Design Principles
 
@@ -21,7 +21,7 @@ Thank you for your interest in contributing to **Split Counter Pro**!
    ```
 3. Run the automated smoke test:
    ```cmd
-   SplitCounter.exe -TestExit
+   Counter-Pro.exe -TestExit
    ```
 
 ## Submitting Pull Requests

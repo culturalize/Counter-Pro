@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug or unexpected behavior in Split Counter Pro
+about: Report a bug or unexpected behavior in Counter-Pro
 title: "[Bug] "
 labels: bug
 assignees: ''
@@ -10,7 +10,7 @@ assignees: ''
 A clear and concise description of what happened.
 
 ## Steps to Reproduce
-1. Launch `SplitCounter.exe`
+1. Launch `Counter-Pro.exe`
 2. Switch to view mode '...'
 3. Press '...'
 

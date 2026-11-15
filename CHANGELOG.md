@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to **Split Counter Pro** are documented in this file.
+All notable changes to **Counter-Pro** are documented in this file.
 
 ## [2.0.0] - 2026-11-15
 
@@ -17,6 +17,7 @@ All notable changes to **Split Counter Pro** are documented in this file.
 - **30-Day Rolling Backups:** Automatic daily snapshots of `counter.txt` in `backups/`.
 
 ### Changed & Optimized
+- Renamed project and executable to **Counter-Pro** (`Counter-Pro.exe`).
 - Moved `WH_MOUSE_LL` and `WH_KEYBOARD_LL` hooks onto a dedicated `Highest`-priority thread with pre-JITted callbacks.
 - Replaced per-click synchronous writes with coalesced asynchronous disk writes (`Interlocked.Exchange`) plus a synchronous exit flush.
 - Added string-length/font signature caching to avoid redundant `CreateGraphics()` calls on every increment.

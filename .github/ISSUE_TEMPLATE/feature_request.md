@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest an enhancement or new feature for Split Counter Pro
+about: Suggest an enhancement or new feature for Counter-Pro
 title: "[Feature] "
 labels: enhancement
 assignees: ''

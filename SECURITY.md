@@ -1,8 +1,8 @@
 # Security & Anti-Cheat Policy
 
-## How Split Counter Pro Interacts with Windows and Games
+## How Counter-Pro Interacts with Windows and Games
 
-**Split Counter Pro** is designed from the ground up to be safe alongside kernel-level anti-cheat systems (such as EasyAntiCheat, BattlEye, and Vanguard):
+**Counter-Pro** is designed from the ground up to be safe alongside kernel-level anti-cheat systems (such as EasyAntiCheat, BattlEye, and Vanguard):
 
 1. **Zero Game Process Access** — The application never calls `OpenProcess`, `ReadProcessMemory`, `WriteProcessMemory`, or `CreateRemoteThread` on any external process.
 2. **Standard Win32 Window Overlay** — The overlay is a normal top-level Windows desktop window using standard documented window styles (`WS_EX_TOPMOST | WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED | WS_EX_TRANSPARENT`). It does not hook DirectX, Vulkan, OpenGL, or DWM.

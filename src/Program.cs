@@ -472,7 +472,7 @@ namespace CounterPro
             FormBorderStyle = FormBorderStyle.None;
             StartPosition = FormStartPosition.CenterScreen;
             TopMost = true;
-            Text = "Split Counter Pro";
+            Text = "Counter-Pro";
             Size = customFullSize;
             MinimumSize = new Size(160, 52);
 
@@ -567,7 +567,7 @@ namespace CounterPro
                 long cur, sess;
                 lock (fileLock) { cur = sections[sections.Count - 1]; }
                 sess = cur - sessionStartValue;
-                string txt = "Split Counter • " + numberPrefix.Trim() + " " + cur.ToString("N0") + " • " + (sess >= 0 ? "+" : "") + sess.ToString("N0") + " session";
+                string txt = "Counter-Pro • " + numberPrefix.Trim() + " " + cur.ToString("N0") + " • " + (sess >= 0 ? "+" : "") + sess.ToString("N0") + " session";
                 if (txt.Length > 63) txt = txt.Substring(0, 63);
                 trayIcon.Text = txt;
             }
@@ -740,7 +740,7 @@ namespace CounterPro
                 if (keyHook != IntPtr.Zero) { UnhookWindowsHookEx(keyHook); keyHook = IntPtr.Zero; }
             });
             hookThread.IsBackground = true;
-            hookThread.Name = "SplitCounterInputHook";
+            hookThread.Name = "CounterProInputHook";
             hookThread.Priority = ThreadPriority.Highest;
             hookThread.Start();
             ready.WaitOne(2000);
@@ -1031,7 +1031,7 @@ namespace CounterPro
             trayIcon = new NotifyIcon
             {
                 Icon = this.Icon ?? SystemIcons.Application,
-                Text = "Split Counter Pro (Click to Show / Unlock Ghost Mode)",
+                Text = "Counter-Pro (Click to Show / Unlock Ghost Mode)",
                 Visible = true,
                 ContextMenuStrip = ctxMenu
             };
@@ -3816,7 +3816,7 @@ namespace CounterPro
     public static class AutoStart
     {
         const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        const string ValueName = "SplitCounterFortniteWatcher";
+        const string ValueName = "CounterProFortniteWatcher";
 
         static string Command() { return "\"" + Application.ExecutablePath + "\" -Watch"; }
 
@@ -3872,9 +3872,9 @@ namespace CounterPro
     {
         [DllImport("user32.dll")] static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
-        public const string UiMutexName = "Local\\SplitCounterPro_Mutex";
-        public const string WatcherMutexName = "Local\\SplitCounterPro_Watcher_Mutex";
-        public const string WatcherStopEventName = "Local\\SplitCounterPro_Watcher_Stop";
+        public const string UiMutexName = "Local\\CounterPro_Mutex";
+        public const string WatcherMutexName = "Local\\CounterPro_Watcher_Mutex";
+        public const string WatcherStopEventName = "Local\\CounterPro_Watcher_Stop";
         public static bool IsWatcherProcess = false;
         static bool uiInitialized = false;
 
@@ -3912,7 +3912,7 @@ namespace CounterPro
                 {
                     if (!launchedWithGame)
                     {
-                        IntPtr existing = FindWindow(null, "Split Counter Pro");
+                        IntPtr existing = FindWindow(null, "Counter-Pro");
                         if (existing != IntPtr.Zero)
                             CounterForm.PostMessage(existing, CounterForm.WM_APP_SHOW_EXISTING, IntPtr.Zero, IntPtr.Zero);
                     }
