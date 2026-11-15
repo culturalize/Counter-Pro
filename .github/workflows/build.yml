@@ -64,8 +64,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = "v2.0.1"
-          $notes = @"
-          ## Counter-Pro $tag
+          $notes = @'
+          ## Counter-Pro v2.0.1
 
           Ultra-lightweight global hotkey counter & customizable game HUD overlay for Windows 10/11 (~115 KB standalone executable, ~3.4 MB idle RAM, zero external dependencies).
 
@@ -88,11 +88,11 @@ jobs:
           - **100% Mouse Pass-Through Mode (`F8`):** Mouse aiming, hover, and clicks pass straight through the overlay into your game.
           - **Hold-Click + Scroll Wheel Scaling:** Live resize the counter number or any sticker on the fly.
           - **30-Day Rolling Daily Backups:** Automatic daily backups of `counter.txt` in `backups/`.
-          "@
+          '@
           $notes | Set-Content -Path "RELEASE_NOTES.md" -Encoding UTF8
 
-          gh release view $tag 2>$null
-          if ($LASTEXITCODE -eq 0) {
-            gh release delete $tag --yes --cleanup-tag
-          }
+          $ErrorActionPreference = 'Continue'
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          $ErrorActionPreference = 'Stop'
           gh release create $tag "Counter-Pro.exe" "Counter-Pro-Windows-x64.zip" "SHA256SUMS.txt" --title "Counter-Pro $tag" --notes-file "RELEASE_NOTES.md" --latest
+          exit 0
