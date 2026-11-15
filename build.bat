@@ -8,7 +8,7 @@ if not exist "%CSC%" (
     exit /b 1
 )
 
-"%CSC%" /nologo /unsafe /optimize+ /target:winexe /win32icon:"%~dp0src\app.ico" /out:"%~dp0Counter-Pro.exe" "%~dp0src\Program.cs"
+"%CSC%" /nologo /optimize+ /target:winexe /win32icon:"%~dp0src\app.ico" /out:"%~dp0Counter-Pro.exe" "%~dp0src\Program.cs"
 if errorlevel 1 (
     echo Build failed.
     exit /b 1

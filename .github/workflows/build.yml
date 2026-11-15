@@ -35,6 +35,7 @@ jobs:
           Copy-Item "README.md" "dist\Counter-Pro\README.md" -Force
           Copy-Item "LICENSE" "dist\Counter-Pro\LICENSE" -Force
           Copy-Item "CHANGELOG.md" "dist\Counter-Pro\CHANGELOG.md" -Force
+          Copy-Item "SECURITY.md" "dist\Counter-Pro\SECURITY.md" -Force
           Copy-Item "src\Program.cs" "dist\Counter-Pro\src\Program.cs" -Force
           Copy-Item "src\app.ico" "dist\Counter-Pro\src\app.ico" -Force
 
@@ -56,13 +57,13 @@ jobs:
             Counter-Pro-Windows-x64.zip
             SHA256SUMS.txt
 
-      - name: Publish GitHub Release (v2.0.0)
+      - name: Publish GitHub Release (v2.0.1)
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $tag = "v2.0.0"
+          $tag = "v2.0.1"
           $notes = @"
           ## Counter-Pro $tag
 
@@ -70,9 +71,14 @@ jobs:
 
           ### 📥 Installation (Pick Either Option)
           - **Option 1 — Direct Standalone App:** Download **`Counter-Pro.exe`** below and run it directly. It automatically creates `counter.txt` (starting at `0`) and `settings.json` on first launch.
-          - **Option 2 — Full Release Bundle (`.zip`):** Download **`Counter-Pro-Windows-x64.zip`** containing `Counter-Pro.exe`, `build.bat` (1-click source compiler), `README.md`, `LICENSE`, and `src\`.
+          - **Option 2 — Full Release Bundle (`.zip`):** Download **`Counter-Pro-Windows-x64.zip`** containing `Counter-Pro.exe`, `build.bat` (1-click source compiler), `README.md`, `CHANGELOG.md`, `SECURITY.md`, `LICENSE`, and `src\`.
 
-          ### ✨ Highlights in $tag
+          ### 🛠 What's Fixed in v2.0.1 (Game Launch & EasyAntiCheat Compatibility)
+          - **Removed Automatic Game Launch Watcher (`-Watch`):** Permanently removed background process polling (`CreateToolhelp32Snapshot`), auto-start registry keys, and automatic desktop resolution switching during game launch.
+          - **Root Cause Postmortem:** Calling `ChangeDisplaySettingsW` and asserting `HWND_TOPMOST` with `SWP_SHOWWINDOW` via an `EVENT_SYSTEM_FOREGROUND` hook within 0–2s of `FortniteLauncher.exe` starting interrupted Unreal Engine's initial DXGI Exclusive Fullscreen swapchain acquisition (`IDXGISwapChain::SetFullscreenState`), causing EasyAntiCheat's 60-second window-visibility watchdog (`Time spent waiting for the game window to become visible: 60013 ms`) to time out with `exit status 1`.
+          - **Passive Z-Order Keeper:** Replaced `SetWinEventHook(EVENT_SYSTEM_FOREGROUND)` with a passive 1500ms `SWP_NOACTIVATE | SWP_NOSENDCHANGING` check that never interferes with fullscreen transitions, and removed all `unsafe` / process-snapshot code.
+
+          ### ✨ Core Features
           - **4 View Modes (`F6`):** Full Card, Mini Card, Slim Gaming HUD Pill, and Just Number Transparent Floating Overlay.
           - **5-Tab Customization Studio (`⚙ Setup`):**
             - Visual Keyboard (`100%`, `80% TKL`, `75%`, `65%`, `60%`) & 5-Button Gaming Mouse hotkey selector.
@@ -81,11 +87,10 @@ jobs:
             - 8 fonts, custom prefix/suffix labels, adjustable outline width, and 2-color directional custom gradients.
           - **100% Mouse Pass-Through Mode (`F8`):** Mouse aiming, hover, and clicks pass straight through the overlay into your game.
           - **Hold-Click + Scroll Wheel Scaling:** Live resize the counter number or any sticker on the fly.
-          - **Automatic Game Watcher (`-Watch`):** Optional ~3.4 MB idle watcher that opens the counter when Fortnite launches and closes when it exits, plus 30-day rolling daily backups.
+          - **30-Day Rolling Daily Backups:** Automatic daily backups of `counter.txt` in `backups/`.
           "@
           $notes | Set-Content -Path "RELEASE_NOTES.md" -Encoding UTF8
 
-          # Remove existing release if updating, then create fresh release with all assets
           gh release view $tag 2>$null
           if ($LASTEXITCODE -eq 0) {
             gh release delete $tag --yes --cleanup-tag

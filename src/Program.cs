@@ -250,15 +250,11 @@ namespace CounterPro
         const int WM_MOUSEACTIVATE = 0x0021;
         const int MA_NOACTIVATE = 3;
         const uint GW_HWNDPREV = 3;
-        const uint EVENT_SYSTEM_FOREGROUND = 0x0003;
-        const uint EVENT_SYSTEM_MINIMIZEEND = 0x0017;
-        const uint WINEVENT_OUTOFCONTEXT = 0x0000;
 
         static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
-        const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040;
+        const uint SWP_NOSIZE = 0x0001, SWP_NOMOVE = 0x0002, SWP_NOACTIVATE = 0x0010, SWP_SHOWWINDOW = 0x0040, SWP_NOSENDCHANGING = 0x0400;
 
         delegate IntPtr HookProc(int nCode, IntPtr wParam, IntPtr lParam);
-        delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
 
         [DllImport("user32.dll", SetLastError = true)] static extern IntPtr SetWindowsHookEx(int idHook, HookProc fn, IntPtr hMod, uint threadId);
         [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hhk);
@@ -270,58 +266,16 @@ namespace CounterPro
         [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
         [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
         [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
-        [DllImport("user32.dll")] static extern IntPtr SetWinEventHook(uint eventMin, uint eventMax, IntPtr hmodWinEventProc, WinEventDelegate lpfnWinEventProc, uint idProcess, uint idThread, uint dwFlags);
-        [DllImport("user32.dll")] static extern bool UnhookWinEvent(IntPtr hWinEventHook);
         [DllImport("user32.dll")] static extern int GetKeyboardType(int nTypeFlag);
         [DllImport("user32.dll")] static extern short GetKeyState(int nVirtKey);
         [DllImport("dwmapi.dll")] static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
         [DllImport("psapi.dll")] static extern bool EmptyWorkingSet(IntPtr hProcess);
         [DllImport("kernel32.dll")] static extern bool SetProcessWorkingSetSize(IntPtr hProcess, IntPtr minSize, IntPtr maxSize);
-        [DllImport("user32.dll", CharSet = CharSet.Ansi)] static extern bool EnumDisplaySettings(string lpszDeviceName, int iModeNum, ref DEVMODE lpDevMode);
-        [DllImport("user32.dll", CharSet = CharSet.Ansi)] static extern int ChangeDisplaySettings(ref DEVMODE lpDevMode, int dwFlags);
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
-        struct DEVMODE
-        {
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmDeviceName;
-            public short dmSpecVersion;
-            public short dmDriverVersion;
-            public short dmSize;
-            public short dmDriverExtra;
-            public int dmFields;
-            public int dmPositionX;
-            public int dmPositionY;
-            public int dmDisplayOrientation;
-            public int dmDisplayFixedOutput;
-            public short dmColor;
-            public short dmDuplex;
-            public short dmYResolution;
-            public short dmTTOption;
-            public short dmCollate;
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)] public string dmFormName;
-            public short dmLogPixels;
-            public int dmBitsPerPel;
-            public int dmPelsWidth;
-            public int dmPelsHeight;
-            public int dmDisplayFlags;
-            public int dmDisplayFrequency;
-            public int dmICMMethod;
-            public int dmICMIntent;
-            public int dmMediaType;
-            public int dmDitherType;
-            public int dmReserved1;
-            public int dmReserved2;
-            public int dmPanningWidth;
-            public int dmPanningHeight;
-        }
 
         static HookProc mouseProc;
         static HookProc keyProc;
-        static WinEventDelegate winEventProc;
         static IntPtr mouseHook;
         static IntPtr keyHook;
-        static IntPtr fgEventHook;
-        static IntPtr minEventHook;
         System.Windows.Forms.Timer topmostTimer;
         public static IntPtr SharedHwnd;
         public static CounterForm ProgramFormInstance;
@@ -338,13 +292,6 @@ namespace CounterPro
         static Thread hookThread;
         static volatile uint hookThreadId;
 
-        // Fortnite automation
-        bool autoLaunchedWithGame = false;
-        bool autoStretchRes = false;
-        bool autoSessionSection = false;
-        bool autoLaunchRegistered = false;
-        int gameMissCount = 0;
-        System.Windows.Forms.Timer gameExitTimer;
         bool overlayInfraStarted = false;
         string backupDir;
         string filePath;
@@ -453,12 +400,9 @@ namespace CounterPro
 
         readonly Color magicTransKey = Color.FromArgb(255, 1, 2, 3);
 
-        public CounterForm(string counterFile, string modeOverride) : this(counterFile, modeOverride, false) { }
-
-        public CounterForm(string counterFile, string modeOverride, bool launchedWithGame)
+        public CounterForm(string counterFile, string modeOverride)
         {
             try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
-            autoLaunchedWithGame = launchedWithGame;
 
             filePath = Path.GetFullPath(counterFile);
             string dir = Path.GetDirectoryName(filePath);
@@ -486,7 +430,6 @@ namespace CounterPro
             AutoDetectKeyboardSize();
             InitSoftTickSound();
             LoadSettings();
-            autoLaunchRegistered = AutoStart.IsRegistered();
 
             if (!string.IsNullOrEmpty(modeOverride))
             {
@@ -501,42 +444,12 @@ namespace CounterPro
             RebuildFonts();
             RefreshAllStickerCaches();
             LoadFromFileSync();
-
-            // New section per Fortnite session (only if the current section actually has gains, so no empty sections)
-            if (autoLaunchedWithGame && autoSessionSection)
-            {
-                lock (fileLock)
-                {
-                    int n = sections.Count;
-                    long cur = sections[n - 1];
-                    long start = (n >= 2) ? sections[n - 2] : (sectionStarts.Count > 0 ? sectionStarts[0] : cur);
-                    if (n == 1 || cur != start)
-                    {
-                        sections.Add(cur);
-                        sectionStarts.Add(cur);
-                    }
-                }
-                SaveToFileSync();
-            }
-
             BuildContextMenuAndTray();
             UpdateTrayText();
             ApplyViewModeGeometry();
             EnsureTextFitsInWindow();
             ClampWindowToActiveScreen();
             SetupFileWatcher();
-
-            // Auto-close when Fortnite exits (only when the watcher launched us with the game)
-            if (autoLaunchedWithGame)
-            {
-                gameExitTimer = new System.Windows.Forms.Timer { Interval = 2000 };
-                gameExitTimer.Tick += (s, e) =>
-                {
-                    if (GameWatch.IsFortniteRunning()) { gameMissCount = 0; return; }
-                    if (++gameMissCount >= 2) { gameExitTimer.Stop(); Close(); }
-                };
-                gameExitTimer.Start();
-            }
         }
 
         // The overlay must NEVER steal focus from the game when it appears (would minimize exclusive-fullscreen Fortnite)
@@ -676,13 +589,9 @@ namespace CounterPro
                 overlayInfraStarted = true;
                 StartHookThread();
 
-                // Event-driven Foreground & Un-Minimize TopMost enforcement (zero game process contact!)
-                winEventProc = OnWinForegroundEvent;
-                fgEventHook = SetWinEventHook(EVENT_SYSTEM_FOREGROUND, EVENT_SYSTEM_FOREGROUND, IntPtr.Zero, winEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
-                minEventHook = SetWinEventHook(EVENT_SYSTEM_MINIMIZEEND, EVENT_SYSTEM_MINIMIZEEND, IntPtr.Zero, winEventProc, 0, 0, WINEVENT_OUTOFCONTEXT);
-
-                // Ultra-cheap Z-order keeper: only calls SetWindowPos when the foreground window has actually climbed ABOVE us
-                topmostTimer = new System.Windows.Forms.Timer { Interval = 750 };
+                // Passive Z-order keeper: checks every 1.5s and only re-asserts HWND_TOPMOST (without SWP_SHOWWINDOW)
+                // when the foreground window has climbed above us. Never interferes with DXGI fullscreen transitions.
+                topmostTimer = new System.Windows.Forms.Timer { Interval = 1500 };
                 topmostTimer.Tick += (s, ev) =>
                 {
                     if (!TopMost || !IsHandleCreated || !Visible || WindowState == FormWindowState.Minimized) return;
@@ -694,7 +603,7 @@ namespace CounterPro
                     {
                         if (h == fg)
                         {
-                            SetWindowPos(this.Handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                            SetWindowPos(this.Handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOSENDCHANGING);
                             break;
                         }
                         h = GetWindow(h, GW_HWNDPREV);
@@ -757,14 +666,6 @@ namespace CounterPro
             Array.Clear(keysDown, 0, keysDown.Length);
         }
 
-        void OnWinForegroundEvent(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
-        {
-            if (IsHandleCreated && TopMost && hwnd != this.Handle)
-            {
-                EnforceGameTopmost();
-            }
-        }
-
         void OnDisplaySettingsChanged(object sender, EventArgs e)
         {
             if (IsHandleCreated)
@@ -800,14 +701,11 @@ namespace CounterPro
         {
             try
             {
-                string dir = Path.GetDirectoryName(filePath);
                 int cw, ch, chz;
                 if (DisplayRes.GetCurrent(out cw, out ch, out chz))
                 {
-                    int fw, fh;
-                    if (!DisplayRes.TryReadFortniteStretch(out fw, out fh)) { fw = 1720; fh = 1080; }
-                    if (cw == fw && ch == fh) DisplayRes.Restore(dir);
-                    else DisplayRes.Apply(fw, fh, dir);
+                    if (cw == 1720 && ch == 1080) DisplayRes.Restore();
+                    else DisplayRes.Apply(1720, 1080);
                     ClampWindowToActiveScreen();
                     EnforceGameTopmost();
                     RebuildButtons();
@@ -839,7 +737,8 @@ namespace CounterPro
             if (TopMost && IsHandleCreated)
             {
                 ApplyGhostExStyle();
-                SetWindowPos(this.Handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_SHOWWINDOW);
+                uint flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | (Visible ? SWP_NOSENDCHANGING : SWP_SHOWWINDOW);
+                SetWindowPos(this.Handle, HWND_TOPMOST, 0, 0, 0, 0, flags);
             }
         }
 
@@ -998,18 +897,8 @@ namespace CounterPro
             var ghostItem = new ToolStripMenuItem("👻 Toggle Click-Through Ghost Mode (" + bindGhost.ShortName() + ")");
             ghostItem.Click += (s, e) => ToggleGhostMode();
 
-            var stretchedItem = new ToolStripMenuItem("🎮 Toggle 1720×1080 Stretched Desktop Res (Fortnite Overlay Fix)");
+            var stretchedItem = new ToolStripMenuItem("🎮 Toggle 1720×1080 Stretched Desktop Res");
             stretchedItem.Click += (s, e) => ToggleStretchedDesktopResolution();
-
-            var autoFnItem = new ToolStripMenuItem("🚀 Auto Open/Close with Fortnite");
-            autoFnItem.Click += (s, e) =>
-            {
-                autoLaunchRegistered = !autoLaunchRegistered;
-                if (autoLaunchRegistered) AutoStart.Enable(); else AutoStart.Disable();
-                RebuildButtons();
-                Invalidate();
-            };
-            ctxMenu.Opening += (s, e) => { autoFnItem.Checked = autoLaunchRegistered; };
 
             var undoItem = new ToolStripMenuItem("↶ Undo Last Section Split");
             undoItem.Click += (s, e) => DoUndoSection();
@@ -1022,7 +911,7 @@ namespace CounterPro
             closeItem.Click += (s, e) => Close();
 
             ctxMenu.Items.AddRange(new ToolStripItem[] {
-                modeMenu, studioItem, keysItem, themeMenu, soundItem, ghostItem, stretchedItem, autoFnItem, undoItem, setValItem,
+                modeMenu, studioItem, keysItem, themeMenu, soundItem, ghostItem, stretchedItem, undoItem, setValItem,
                 new ToolStripSeparator(), closeItem
             });
 
@@ -2020,43 +1909,13 @@ namespace CounterPro
                 });
                 bool isStretched = (Screen.PrimaryScreen.Bounds.Width == 1720);
                 AddFixedBtn("fn_stretch", isStretched ? "✓ 1720×1080 Res: ON" : "🎮 1720×1080 Res Fix",
-                    "Toggles Windows desktop between 1720x1080 and 1920x1080 so overlays work over Stretched Res Fortnite!",
+                    "Manually toggles Windows desktop between 1720x1080 and your default resolution",
                     new Rectangle(395, gy, 231, 32), false, isStretched, isStretched, () => ToggleStretchedDesktopResolution());
 
-                // --- Fortnite Automation ---
                 gy += 44;
-                AddFixedBtn("auto_fn", autoLaunchRegistered ? "✓ Auto Open/Close with Fortnite: ON" : "🚀 Auto Open/Close with Fortnite: OFF",
-                    "Counter opens automatically when Fortnite starts and closes when Fortnite exits (tiny idle watcher, starts with Windows)",
-                    new Rectangle(24, gy, 300, 30), false, autoLaunchRegistered, autoLaunchRegistered, () =>
-                    {
-                        autoLaunchRegistered = !autoLaunchRegistered;
-                        if (autoLaunchRegistered) AutoStart.Enable(); else AutoStart.Disable();
-                        RebuildButtons();
-                        Invalidate();
-                    });
-                AddFixedBtn("auto_res", autoStretchRes ? "✓ Auto Stretched Res with Fortnite: ON" : "Auto Stretched Res with Fortnite: OFF",
-                    "Switches your desktop to Fortnite's stretched resolution when it launches and restores it when it closes (keeps your refresh rate)",
-                    new Rectangle(332, gy, 294, 30), false, autoStretchRes, autoStretchRes, () =>
-                    {
-                        autoStretchRes = !autoStretchRes;
-                        SaveSettings();
-                        RebuildButtons();
-                        Invalidate();
-                    });
-
-                gy += 40;
-                AddFixedBtn("auto_sec", autoSessionSection ? "✓ New Section Each Fortnite Session: ON" : "New Section Each Fortnite Session: OFF",
-                    "Automatically adds a section divider each time Fortnite launches (skipped if the last section had no gains)",
-                    new Rectangle(24, gy, 300, 30), false, autoSessionSection, autoSessionSection, () =>
-                    {
-                        autoSessionSection = !autoSessionSection;
-                        SaveSettings();
-                        RebuildButtons();
-                        Invalidate();
-                    });
-                AddFixedBtn("open_backups", "📁 Open Daily Backups (30 days)",
-                    "counter.txt is backed up once per day automatically - open the folder",
-                    new Rectangle(332, gy, 294, 30), false, false, false, () =>
+                AddFixedBtn("open_backups", "📁 Open Automatic Daily Backups Folder (30-Day Rolling History)",
+                    "counter.txt is backed up once per day automatically - click to open the backups folder",
+                    new Rectangle(24, gy, Width - 48, 30), false, false, false, () =>
                     {
                         try { Directory.CreateDirectory(backupDir); Process.Start("explorer.exe", "\"" + backupDir + "\""); } catch { }
                     });
@@ -3402,8 +3261,6 @@ namespace CounterPro
 
                 soundEnabled = ExtractInt(json, "soundEnabled", 0) == 1;
                 isGhostMode = ExtractInt(json, "ghostMode", viewMode == 3 ? 1 : 0) == 1;
-                autoStretchRes = ExtractInt(json, "autoStretchRes", 0) == 1;
-                autoSessionSection = ExtractInt(json, "autoSessionSection", 0) == 1;
                 gameOverlayNoActivate = ExtractInt(json, "gameOverlayNoActivate", 1) == 1;
                 stepAmount = Math.Max(1, ExtractInt(json, "stepAmount", 1));
                 targetGoal = Math.Max(10, ExtractInt(json, "targetGoal", 2500));
@@ -3503,8 +3360,6 @@ namespace CounterPro
                 sb.AppendLine("  \"opacityPercent\": " + (int)Math.Round(userOpacity * 100) + ",");
                 sb.AppendLine("  \"soundEnabled\": " + (soundEnabled ? 1 : 0) + ",");
                 sb.AppendLine("  \"ghostMode\": " + (isGhostMode ? 1 : 0) + ",");
-                sb.AppendLine("  \"autoStretchRes\": " + (autoStretchRes ? 1 : 0) + ",");
-                sb.AppendLine("  \"autoSessionSection\": " + (autoSessionSection ? 1 : 0) + ",");
                 sb.AppendLine("  \"gameOverlayNoActivate\": " + (gameOverlayNoActivate ? 1 : 0) + ",");
                 sb.AppendLine("  \"stepAmount\": " + stepAmount + ",");
                 sb.AppendLine("  \"targetGoal\": " + targetGoal + ",");
@@ -3566,11 +3421,8 @@ namespace CounterPro
         {
             SaveSettings();
             SaveToFileSync(); // guaranteed flush of the latest count before exit
-            if (gameExitTimer != null) { gameExitTimer.Stop(); gameExitTimer.Dispose(); gameExitTimer = null; }
             try { Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged; } catch { }
             if (topmostTimer != null) { topmostTimer.Stop(); topmostTimer.Dispose(); topmostTimer = null; }
-            if (fgEventHook != IntPtr.Zero) { UnhookWinEvent(fgEventHook); fgEventHook = IntPtr.Zero; }
-            if (minEventHook != IntPtr.Zero) { UnhookWinEvent(minEventHook); minEventHook = IntPtr.Zero; }
             if (watcher != null) { watcher.EnableRaisingEvents = false; watcher.Dispose(); watcher = null; }
             StopHookThread();
             if (trayIcon != null) { trayIcon.Visible = false; trayIcon.Dispose(); trayIcon = null; }
@@ -3640,79 +3492,7 @@ namespace CounterPro
         }
     }
 
-    // Zero-allocation Fortnite process detector. Uses a Toolhelp snapshot only — it NEVER opens a handle
-    // to any game process, so EasyAntiCheat sees nothing.
-    public static unsafe class GameWatch
-    {
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        struct PROCESSENTRY32W
-        {
-            public uint dwSize;
-            public uint cntUsage;
-            public uint th32ProcessID;
-            public IntPtr th32DefaultHeapID;
-            public uint th32ModuleID;
-            public uint cntThreads;
-            public uint th32ParentProcessID;
-            public int pcPriClassBase;
-            public uint dwFlags;
-            public fixed char szExeFile[260];
-        }
-
-        [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
-        [DllImport("kernel32.dll", EntryPoint = "Process32FirstW")] static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32W lppe);
-        [DllImport("kernel32.dll", EntryPoint = "Process32NextW")] static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32W lppe);
-        [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr hObject);
-
-        static readonly string[] Names = new string[] {
-            "FortniteClient-Win64-Shipping.exe",
-            "FortniteClient-Win64-Shipping_EAC_EOS.exe",
-            "FortniteClient-Win64-Shipping_EAC.exe",
-            "FortniteClient-Win64-Shipping_BE.exe",
-            "FortniteLauncher.exe"
-        };
-
-        static bool EqualsIgnoreCase(char* p, string s)
-        {
-            int i = 0;
-            for (; i < s.Length; i++)
-            {
-                char a = p[i];
-                if (a == '\0') return false;
-                char b = s[i];
-                if (a >= 'A' && a <= 'Z') a = (char)(a + 32);
-                if (b >= 'A' && b <= 'Z') b = (char)(b + 32);
-                if (a != b) return false;
-            }
-            return p[i] == '\0';
-        }
-
-        public static bool IsFortniteRunning()
-        {
-            IntPtr snap = CreateToolhelp32Snapshot(0x00000002 /* TH32CS_SNAPPROCESS */, 0);
-            if (snap == IntPtr.Zero || snap == new IntPtr(-1)) return false;
-            try
-            {
-                PROCESSENTRY32W pe = new PROCESSENTRY32W();
-                pe.dwSize = (uint)sizeof(PROCESSENTRY32W);
-                if (!Process32First(snap, ref pe)) return false;
-                do
-                {
-                    char* n = pe.szExeFile;
-                    // Fast reject: first char must be 'F'/'f'
-                    if (n[0] == 'F' || n[0] == 'f')
-                    {
-                        for (int i = 0; i < Names.Length; i++)
-                            if (EqualsIgnoreCase(n, Names[i])) return true;
-                    }
-                } while (Process32Next(snap, ref pe));
-            }
-            finally { CloseHandle(snap); }
-            return false;
-        }
-    }
-
-    // Desktop resolution switching (dynamic, never written to the registry -> a reboot always restores your normal res)
+    // Manual desktop resolution switching (dynamic, never written to the registry -> a reboot always restores your normal res)
     public static class DisplayRes
     {
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -3736,8 +3516,6 @@ namespace CounterPro
 
         const int DM_PELSWIDTH = 0x00080000, DM_PELSHEIGHT = 0x00100000, DM_DISPLAYFREQUENCY = 0x00400000;
 
-        static string MarkerPath(string dir) { return Path.Combine(dir, "display_restore.flag"); }
-
         public static bool GetCurrent(out int w, out int h, out int hz)
         {
             w = h = hz = 0;
@@ -3748,7 +3526,7 @@ namespace CounterPro
             return true;
         }
 
-        public static bool Apply(int w, int h, string dir)
+        public static bool Apply(int w, int h)
         {
             DEVMODEW dm = new DEVMODEW();
             dm.dmSize = (short)Marshal.SizeOf(typeof(DEVMODEW));
@@ -3765,106 +3543,12 @@ namespace CounterPro
                 dm.dmFields = DM_PELSWIDTH | DM_PELSHEIGHT;
                 r = ChangeDisplaySettings(ref dm, 0);
             }
-            if (r == 0)
-            {
-                try { File.WriteAllText(MarkerPath(dir), DateTime.Now.ToString("o")); } catch { }
-                return true;
-            }
-            return false;
+            return r == 0;
         }
 
-        public static void Restore(string dir)
+        public static void Restore()
         {
             ChangeDisplaySettingsNull(IntPtr.Zero, 0); // back to the saved Windows default mode
-            try { File.Delete(MarkerPath(dir)); } catch { }
-        }
-
-        // If the PC/app crashed while stretched, put the desktop back the next time the watcher starts
-        public static void RecoverIfNeeded(string dir)
-        {
-            try
-            {
-                if (File.Exists(MarkerPath(dir)) && !GameWatch.IsFortniteRunning()) Restore(dir);
-            }
-            catch { }
-        }
-
-        // Reads Fortnite's own config: only returns true when Fortnite is in exclusive Fullscreen at a custom (stretched) res
-        public static bool TryReadFortniteStretch(out int w, out int h)
-        {
-            w = h = 0;
-            try
-            {
-                string ini = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    @"FortniteGame\Saved\Config\WindowsClient\GameUserSettings.ini");
-                if (!File.Exists(ini)) return false;
-                int mode = -1;
-                foreach (string raw in File.ReadLines(ini))
-                {
-                    string line = raw.Trim();
-                    if (line.StartsWith("FullscreenMode=")) int.TryParse(line.Substring(15), out mode);
-                    else if (line.StartsWith("ResolutionSizeX=")) int.TryParse(line.Substring(16), out w);
-                    else if (line.StartsWith("ResolutionSizeY=")) int.TryParse(line.Substring(16), out h);
-                }
-                return mode == 0 && w >= 640 && h >= 480;
-            }
-            catch { return false; }
-        }
-    }
-
-    // "Start with Windows" watcher registration (HKCU Run key, no admin needed)
-    public static class AutoStart
-    {
-        const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
-        const string ValueName = "CounterProFortniteWatcher";
-
-        static string Command() { return "\"" + Application.ExecutablePath + "\" -Watch"; }
-
-        public static bool IsRegistered()
-        {
-            try
-            {
-                using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey, false))
-                    return k != null && k.GetValue(ValueName) != null;
-            }
-            catch { return false; }
-        }
-
-        public static void Enable()
-        {
-            try
-            {
-                using (var k = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RunKey))
-                    k.SetValue(ValueName, Command());
-            }
-            catch { }
-            // Clear any pending stop request, then start the watcher now (a duplicate exits instantly via its mutex)
-            try
-            {
-                EventWaitHandle ev;
-                if (EventWaitHandle.TryOpenExisting(Program.WatcherStopEventName, out ev)) { ev.Reset(); ev.Dispose(); }
-            }
-            catch { }
-            if (!Program.IsWatcherProcess)
-            {
-                try { Process.Start(new ProcessStartInfo(Application.ExecutablePath, "-Watch") { UseShellExecute = false, WorkingDirectory = Path.GetDirectoryName(Application.ExecutablePath) }); } catch { }
-            }
-        }
-
-        public static void Disable()
-        {
-            try
-            {
-                using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKey, true))
-                    if (k != null) k.DeleteValue(ValueName, false);
-            }
-            catch { }
-            try
-            {
-                EventWaitHandle ev;
-                if (EventWaitHandle.TryOpenExisting(Program.WatcherStopEventName, out ev)) { ev.Set(); ev.Dispose(); }
-            }
-            catch { }
         }
     }
 
@@ -3872,11 +3556,7 @@ namespace CounterPro
     {
         [DllImport("user32.dll")] static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
 
-        public const string UiMutexName = "Local\\CounterPro_Mutex";
-        public const string WatcherMutexName = "Local\\CounterPro_Watcher_Mutex";
-        public const string WatcherStopEventName = "Local\\CounterPro_Watcher_Stop";
-        public static bool IsWatcherProcess = false;
-        static bool uiInitialized = false;
+        public const string UiMutexName = "Local\\CounterPro_SingleInstance_Mutex";
 
         [STAThread]
         public static void Main(string[] args)
@@ -3885,7 +3565,6 @@ namespace CounterPro
             string counterFile = Path.Combine(baseDir, "counter.txt");
             string modeArg = null;
             bool testExit = false;
-            bool watch = false;
 
             for (int i = 0; i < args.Length; i++)
             {
@@ -3895,38 +3574,22 @@ namespace CounterPro
                     modeArg = args[++i];
                 else if (string.Equals(args[i], "-TestExit", StringComparison.OrdinalIgnoreCase))
                     testExit = true;
-                else if (string.Equals(args[i], "-Watch", StringComparison.OrdinalIgnoreCase))
-                    watch = true;
             }
 
-            if (watch) { RunWatcher(counterFile); return; }
-            RunCounterUI(counterFile, modeArg, false, testExit);
-        }
-
-        public static bool RunCounterUI(string counterFile, string modeArg, bool launchedWithGame, bool testExit)
-        {
             bool createdNew;
             using (var mutex = new Mutex(true, UiMutexName, out createdNew))
             {
                 if (!createdNew && !testExit)
                 {
-                    if (!launchedWithGame)
-                    {
-                        IntPtr existing = FindWindow(null, "Counter-Pro");
-                        if (existing != IntPtr.Zero)
-                            CounterForm.PostMessage(existing, CounterForm.WM_APP_SHOW_EXISTING, IntPtr.Zero, IntPtr.Zero);
-                    }
-                    return false;
+                    IntPtr existing = FindWindow(null, "Counter-Pro");
+                    if (existing != IntPtr.Zero)
+                        CounterForm.PostMessage(existing, CounterForm.WM_APP_SHOW_EXISTING, IntPtr.Zero, IntPtr.Zero);
+                    return;
                 }
 
-                if (!uiInitialized)
-                {
-                    Application.EnableVisualStyles();
-                    Application.SetCompatibleTextRenderingDefault(false);
-                    uiInitialized = true;
-                }
-
-                var form = new CounterForm(counterFile, modeArg, launchedWithGame);
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                var form = new CounterForm(counterFile, modeArg);
                 CounterForm.ProgramFormInstance = form;
                 if (testExit)
                 {
@@ -3937,72 +3600,6 @@ namespace CounterPro
                 CounterForm.ProgramFormInstance = null;
                 if (createdNew) { try { mutex.ReleaseMutex(); } catch { } }
             }
-            return true;
-        }
-
-        // Idle watcher: sleeps in the kernel, wakes every 2s for a ~0.1ms process snapshot. No window, no hooks, no rendering.
-        static void RunWatcher(string counterFile)
-        {
-            bool createdNew;
-            using (var mutex = new Mutex(true, WatcherMutexName, out createdNew))
-            {
-                if (!createdNew) return;
-                IsWatcherProcess = true;
-                string dir = Path.GetDirectoryName(Path.GetFullPath(counterFile));
-                string settingsPath = Path.Combine(dir, "settings.json");
-
-                using (var stopEvt = new EventWaitHandle(false, EventResetMode.ManualReset, WatcherStopEventName))
-                {
-                    stopEvt.Reset();
-                    SetIdlePriority();
-                    DisplayRes.RecoverIfNeeded(dir);
-                    CounterForm.TrimMemory();
-
-                    while (true)
-                    {
-                        // 1. Dormant: wait for Fortnite to start
-                        while (!GameWatch.IsFortniteRunning())
-                        {
-                            if (stopEvt.WaitOne(2000)) return;
-                        }
-
-                        // 2. Fortnite detected -> optional stretched res, then open the counter overlay
-                        bool resChanged = false;
-                        string json = "";
-                        try { if (File.Exists(settingsPath)) json = File.ReadAllText(settingsPath); } catch { }
-                        if (CounterForm.ExtractInt(json, "autoStretchRes", 0) == 1)
-                        {
-                            int fw, fh;
-                            if (DisplayRes.TryReadFortniteStretch(out fw, out fh))
-                                resChanged = DisplayRes.Apply(fw, fh, dir);
-                        }
-
-                        RunCounterUI(counterFile, null, true, false); // blocks until the counter closes (game exit or user close)
-
-                        // 3. Wait until Fortnite is truly gone (2 consecutive misses) so a manual close doesn't re-open it mid-game
-                        int misses = 0;
-                        bool stopping = false;
-                        while (misses < 2)
-                        {
-                            if (stopEvt.WaitOne(2000)) { stopping = true; break; }
-                            misses = GameWatch.IsFortniteRunning() ? 0 : misses + 1;
-                        }
-                        if (resChanged || File.Exists(Path.Combine(dir, "display_restore.flag")))
-                        {
-                            if (!GameWatch.IsFortniteRunning()) DisplayRes.Restore(dir);
-                        }
-                        if (stopping) return;
-
-                        SetIdlePriority();
-                        CounterForm.TrimMemory();
-                    }
-                }
-            }
-        }
-
-        static void SetIdlePriority()
-        {
-            try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.Idle; } catch { }
         }
     }
 }

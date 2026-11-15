@@ -25,12 +25,12 @@ Cycle seamlessly between four display layouts at any time (`F6` by default or vi
 - **Stickers & Decor Studio** — Add free-draggable custom images (`PNG`, `JPG`, `GIF`, `ICO`) or built-in vector icons (Chest, Crown, Gem, Skull, Flame, Key, Trophy, Star) around your counter.
 - **19 Colour Themes + Custom Theme Builder** — Includes 18 curated dark/OLED/neon presets (*Obsidian Cyan*, *Emerald Matrix*, *Crimson Ember*, *Violet Nebula*, *Amber Gold*, *Sakura Neon*, *OLED Pitch Black*, *Cyberpunk 2077*, *Blood Moon*, *Nordic Frost*, *Dracula*, *Monokai Pro*, *Synthwave Sunset*, *Stealth Tactical*, *Catppuccin Mocha*, *Tokyo Night*, *Solarized Dark*, *Arctic Daylight*) plus a full RGB custom theme builder.
 - **Fonts, Sizes & Custom Gradients** — Choose from 8 font families, adjustable outline thickness, 5 text effect styles (Outline + Glow, Crisp Outline, 3D Shadow, 2-Tone Directional Gradient, Clean Flat), custom gradient color pickers, and custom prefix/suffix labels (e.g., `CHESTS 1,250` or `120 WINS`).
-- **Game Overlay, Goals & Automation** — True click-through/mouse pass-through mode (`WS_EX_TRANSPARENT`), non-activating topmost game overlay (`WS_EX_NOACTIVATE`), custom step sizes (`+1` to `+50`), milestone targets, automatic Fortnite launch/exit watcher, stretched-resolution helper, and automatic 30-day rolling daily backups.
+- **Game Overlay, Goals & Backups** — True click-through/mouse pass-through mode (`WS_EX_TRANSPARENT`), non-activating topmost game overlay (`WS_EX_NOACTIVATE`), custom step sizes (`+1` to `+50`), milestone targets, manual `1720×1080` desktop resolution toggle, and automatic 30-day rolling daily backups.
 
-### Built for Gaming Performance
+### Built for Gaming Performance & Anti-Cheat Safety
 - **Dedicated High-Priority Input Hook Thread** — Low-level mouse (`WH_MOUSE_LL`) and keyboard (`WH_KEYBOARD_LL`) hooks run on a dedicated `Highest`-priority message pump with pre-JITted callbacks, ensuring UI rendering never delays mouse or keyboard input.
 - **100% Mouse Pass-Through (`F8`)** — When enabled, mouse movement, aiming, and clicks pass straight through the overlay into your game without snagging the cursor.
-- **Anti-Cheat Friendly Architecture** — Never injects DLLs, hooks DirectX, or opens handles to game processes. Process detection uses read-only `CreateToolhelp32Snapshot` system snapshots.
+- **Zero Process Polling & Fullscreen SwapChain Safe** — Never injects DLLs, never hooks DirectX/DXGI, never polls process tables (`CreateToolhelp32Snapshot`), and never changes display modes during game launch. Passive `SWP_NOACTIVATE | SWP_NOSENDCHANGING` Z-order keeping ensures EasyAntiCheat/BattlEye bootstrappers and Exclusive Fullscreen swapchains initialize without interruption (see [`CHANGELOG.md`](CHANGELOG.md) and [`SECURITY.md`](SECURITY.md)).
 - **Coalesced Asynchronous Disk Saves** — Rapid bursts of clicks coalesce into a single background write to `counter.txt` with a synchronous flush on exit, plus automatic daily backups in `backups/`.
 
 ---
@@ -43,7 +43,7 @@ All hotkeys and mouse buttons can be rebound or cleared (`Delete` / `Backspace`)
 | :--- | :--- | :--- |
 | **Increment (`+Step`)** | `Mouse 5` (Side Front) | Adds the configured step amount to the current count |
 | **New Section Split** | `F9` | Inserts a `----------` section divider in `counter.txt` without resetting your total |
-| **Decrement (`-Step`)** | `F7` *(or Unbound)* | Subtracts the configured step amount |
+| **Decrement (`-Step`)** | `Unbound` | Subtracts the configured step amount |
 | **Mouse Pass-Through (Ghost)** | `F8` | Toggles 100% mouse hover & click pass-through on/off |
 | **Cycle View Mode** | `F6` | Cycles through Full, Mini, HUD Pill, and Just Number modes |
 | **Quick Scale (Number / Sticker)** | `Hold Left-Click + Scroll` | Hold Left-Click on the number or a sticker and scroll the mouse wheel to resize it live |
@@ -68,9 +68,6 @@ All hotkeys and mouse buttons can be rebound or cleared (`Delete` / `Backspace`)
 
 # Override the increment trigger at startup (Mouse4, Mouse5, or F9)
 .\Counter-Pro.exe -Button Mouse5
-
-# Run the ultra-lightweight (~3.4 MB RAM) background game watcher
-.\Counter-Pro.exe -Watch
 ```
 
 ---
@@ -85,7 +82,7 @@ Double-click [`build.bat`](build.bat) or run:
 build.bat
 ```
 
-This compiles [`src/Program.cs`](src/Program.cs) with `/unsafe /optimize+` into `Counter-Pro.exe`.
+This compiles [`src/Program.cs`](src/Program.cs) with `/optimize+` into `Counter-Pro.exe`.
 
 ---
 
